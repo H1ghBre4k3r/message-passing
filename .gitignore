@@ -1,1 +1,13 @@
 /target
+**/*.rs.bk
+*.pdb
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
