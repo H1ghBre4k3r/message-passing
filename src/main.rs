@@ -1,18 +1,14 @@
 use std::{
-    sync::{
-        Arc,
-        mpsc::{Receiver, Sender, channel},
-    },
+    sync::mpsc::{Receiver, Sender, channel},
     thread::JoinHandle,
 };
 
 #[derive(Clone)]
 struct Mailbox<T>(Sender<T>);
 
-#[derive(Clone)]
 struct Task<M, R> {
     mailbox: Mailbox<M>,
-    handle: Arc<JoinHandle<R>>,
+    handle: JoinHandle<R>,
 }
 
 impl<T, R> Task<T, R>
@@ -24,7 +20,7 @@ where
     }
 
     pub fn join(self) -> R {
-        Arc::try_unwrap(self.handle).unwrap().join().unwrap()
+        self.handle.join().unwrap()
     }
 }
 
@@ -52,7 +48,7 @@ where
 
     Task {
         mailbox: mb,
-        handle: Arc::new(handle),
+        handle,
     }
 }
 
