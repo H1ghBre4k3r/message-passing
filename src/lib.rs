@@ -6,7 +6,7 @@ use std::{
 #[derive(Clone)]
 struct Mailbox<T>(Sender<T>);
 
-struct Task<M, R> {
+pub struct Task<M, R> {
     mailbox: Mailbox<M>,
     handle: JoinHandle<R>,
 }
@@ -24,9 +24,10 @@ where
     }
 }
 
+#[macro_export]
 macro_rules! proc {
     ($($content:tt)*) => {
-        spawn_task(move |_receiver| {
+        message_passing::spawn_task(move |_receiver| {
             #[allow(unused_macros)]
             macro_rules! recv {
                 () => { _receiver.recv().unwrap() }
@@ -36,7 +37,7 @@ macro_rules! proc {
     };
 }
 
-fn spawn_task<M, R, Func>(func: Func) -> Task<M, R>
+pub fn spawn_task<M, R, Func>(func: Func) -> Task<M, R>
 where
     M: Send + 'static,
     R: Send + 'static,
@@ -50,33 +51,4 @@ where
         mailbox: mb,
         handle,
     }
-}
-
-fn main() {
-    let (sender, receiver) = channel::<u32>();
-    let task: Task<u32, u32> = proc! {
-        let mut counter = 0;
-        for _ in 0..10 {
-            let val = recv!();
-
-            println!("received {val}");
-            counter += val;
-            sender.send(counter).unwrap();
-        }
-
-        counter
-    };
-
-    let next_task: Task<(), u32> = proc! {
-        for i in 0..10 {
-            task.send(i);
-            let current_counter = receiver.recv().unwrap();
-            println!("current counter: {current_counter}");
-        }
-
-        task.join()
-    };
-
-    let result = next_task.join();
-    println!("OH YES! {result}")
 }
