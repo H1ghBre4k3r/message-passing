@@ -1,4 +1,4 @@
-# message-passing
+# notizia
 
 Message passing in Rust. Provides a custom task abstraction with mailbox-based communication and macro-based task spawning.
 
@@ -12,6 +12,8 @@ This project demonstrates message passing patterns in Rust using:
 ## Example
 
 ```rust
+use notizia::{Task, proc};
+
 // Create a task that sums up numbers it receives
 let task: Task<u32, u32> = proc! {
     let mut total = 0;
@@ -38,10 +40,10 @@ assert_eq!(result, 15);  // 1 + 2 + 3 + 4 + 5 = 15
 cargo build
 ```
 
-## Running
+## Running Examples
 
 ```bash
-cargo run
+cargo run --example simple
 ```
 
 ## Testing
@@ -60,6 +62,12 @@ cargo fmt
 ## Documentation
 
 See [AGENTS.md](AGENTS.md) for detailed information about the codebase structure, patterns, and conventions.
+
+Generate API documentation:
+
+```bash
+cargo doc --open
+```
 
 ## License
 

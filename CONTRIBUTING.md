@@ -1,6 +1,6 @@
 # Contributing
 
-Thank you for your interest in contributing to message-passing!
+Thank you for your interest in contributing to notizia!
 
 ## Development Setup
 
