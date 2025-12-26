@@ -5,6 +5,7 @@ edition = "2024"
 authors = ["Louis Meyer (H1ghBre4k3r) <h1ghbe4k3r@dev.bre4k3r.de>"]
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/H1ghBre4k3r/notizia"
 
 [features]
 default = []
