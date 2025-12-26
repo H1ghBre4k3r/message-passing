@@ -4,14 +4,14 @@ use tokio::{
 };
 
 #[derive(Clone)]
-struct Mailbox<T>(Sender<T>);
+struct AsyncMailbox<T>(Sender<T>);
 
-pub struct Task<M, R> {
-    mailbox: Mailbox<M>,
+pub struct AsyncTask<M, R> {
+    mailbox: AsyncMailbox<M>,
     handle: JoinHandle<R>,
 }
 
-impl<T, R> Task<T, R>
+impl<T, R> AsyncTask<T, R>
 where
     T: Clone,
 {
@@ -25,9 +25,9 @@ where
 }
 
 #[macro_export]
-macro_rules! proc {
+macro_rules! async_proc {
     ($($content:tt)*) => {
-        notizia::spawn_task(move |mut _receiver| async move {
+        notizia::spawn_async_task(move |mut _receiver| async move {
             #[allow(unused_macros)]
             macro_rules! recv {
                 () => { _receiver.recv().await.unwrap() }
@@ -37,7 +37,7 @@ macro_rules! proc {
     };
 }
 
-pub fn spawn_task<M, R, Output, Func>(func: Func) -> Task<M, Output>
+pub fn spawn_async_task<M, R, Output, Func>(func: Func) -> AsyncTask<M, Output>
 where
     M: Send + 'static,
     R: Send + 'static + Future<Output = Output>,
@@ -45,10 +45,10 @@ where
     Func: FnOnce(Receiver<M>) -> R + Send + 'static,
 {
     let (sender, receiver) = channel::<M>(64);
-    let mb = Mailbox(sender);
+    let mb = AsyncMailbox(sender);
     let handle = tokio::spawn(func(receiver));
 
-    Task {
+    AsyncTask {
         mailbox: mb,
         handle,
     }

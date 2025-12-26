@@ -1,6 +1,4 @@
-#[cfg(not(feature = "tokio"))]
 mod std_impl;
-#[cfg(not(feature = "tokio"))]
 pub use self::std_impl::*;
 
 #[cfg(feature = "tokio")]

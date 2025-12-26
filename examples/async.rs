@@ -1,10 +1,10 @@
-use notizia::{Task, proc};
+use notizia::{AsyncTask, async_proc};
 use tokio::sync::mpsc::channel;
 
 #[tokio::main]
 async fn main() {
     let (sender, mut receiver) = channel::<u32>(64);
-    let task: Task<u32, u32> = proc! {
+    let task: AsyncTask<u32, u32> = async_proc! {
         let mut counter = 0;
         for _ in 0..10 {
             let val = recv!();
@@ -17,7 +17,7 @@ async fn main() {
         counter
     };
 
-    let next_task: Task<(), u32> = proc! {
+    let next_task: AsyncTask<(), u32> = async_proc! {
         for i in 0..10 {
             task.send(i).await;
             let current_counter = receiver.recv().await.unwrap();
