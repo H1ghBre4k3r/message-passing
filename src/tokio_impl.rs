@@ -1,14 +1,33 @@
-use std::future::Future;
+use std::{future::Future, sync::mpsc::RecvTimeoutError, time::Duration};
 use tokio::{
-    sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+    sync::mpsc::{UnboundedReceiver, UnboundedSender, error::SendError, unbounded_channel},
     task::JoinHandle,
 };
 
-#[derive(Clone)]
-struct AsyncMailbox<T>(UnboundedSender<T>);
+pub struct AsyncMailbox<T> {
+    receiver: UnboundedReceiver<T>,
+}
+
+impl<T> AsyncMailbox<T> {
+    pub fn new(receiver: UnboundedReceiver<T>) -> Self {
+        AsyncMailbox { receiver }
+    }
+
+    pub async fn recv(&mut self) -> Option<T> {
+        self.receiver.recv().await
+    }
+
+    pub async fn recv_timeout(
+        &mut self,
+        duration: Duration,
+    ) -> Result<Option<T>, RecvTimeoutError> {
+        let item = tokio::time::timeout(duration, self.recv()).await;
+        item.map_err(|_| RecvTimeoutError::Timeout)
+    }
+}
 
 pub struct AsyncTask<M, R> {
-    mailbox: AsyncMailbox<M>,
+    sender: UnboundedSender<M>,
     handle: JoinHandle<R>,
 }
 
@@ -16,8 +35,8 @@ impl<T, R> AsyncTask<T, R>
 where
     T: Clone,
 {
-    pub async fn send(&self, payload: T) {
-        self.mailbox.0.send(payload).unwrap()
+    pub async fn send(&self, payload: T) -> Result<(), SendError<T>> {
+        self.sender.send(payload)
     }
 
     pub async fn join(self) -> R {
@@ -28,10 +47,10 @@ where
 #[macro_export]
 macro_rules! async_proc {
     ($($content:tt)*) => {
-        notizia::spawn_async_task(move |mut _receiver| async move {
+        notizia::spawn_async_task(move |mut __mb| async move {
             #[allow(unused_macros)]
             macro_rules! recv {
-                () => { _receiver.recv().await.unwrap() }
+                () => { __mb.recv().await.unwrap() }
             }
             $($content)*
         })
@@ -43,16 +62,13 @@ where
     M: Send + 'static,
     R: Send + 'static + Future<Output = Output>,
     Output: Send + 'static,
-    Func: FnOnce(UnboundedReceiver<M>) -> R + Send + 'static,
+    Func: FnOnce(AsyncMailbox<M>) -> R + Send + 'static,
 {
     let (sender, receiver) = unbounded_channel::<M>();
-    let mb = AsyncMailbox(sender);
-    let handle = tokio::spawn(func(receiver));
+    let mb = AsyncMailbox::new(receiver);
+    let handle = tokio::spawn(func(mb));
 
-    AsyncTask {
-        mailbox: mb,
-        handle,
-    }
+    AsyncTask { sender, handle }
 }
 
 #[cfg(test)]
@@ -69,9 +85,9 @@ mod tests {
             total
         });
 
-        task.send(10).await;
-        task.send(20).await;
-        task.send(30).await;
+        task.send(10).await.unwrap();
+        task.send(20).await.unwrap();
+        task.send(30).await.unwrap();
 
         let result = task.join().await;
         assert_eq!(result, 60);
@@ -88,7 +104,7 @@ mod tests {
         });
 
         for i in 1..=5 {
-            task.send(i).await;
+            task.send(i).await.unwrap();
         }
 
         let result = task.join().await;
@@ -105,9 +121,9 @@ mod tests {
             sum
         });
 
-        task.send(5).await;
-        task.send(10).await;
-        task.send(15).await;
+        task.send(5).await.unwrap();
+        task.send(10).await.unwrap();
+        task.send(15).await.unwrap();
 
         let result = task.join().await;
         assert_eq!(result, 30);
@@ -124,9 +140,9 @@ mod tests {
             count
         });
 
-        task.send("hello".to_string()).await;
-        task.send("world".to_string()).await;
-        task.send("test".to_string()).await;
+        task.send("hello".to_string()).await.unwrap();
+        task.send("world".to_string()).await.unwrap();
+        task.send("test".to_string()).await.unwrap();
 
         let result = task.join().await;
         assert_eq!(result, 3);
@@ -144,7 +160,7 @@ mod tests {
         });
 
         for i in 1..=5 {
-            task.send(i).await;
+            task.send(i).await.unwrap();
         }
 
         let result = task.join().await;
@@ -153,9 +169,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_empty_task() {
-        let task = spawn_async_task(
-            |_receiver: tokio::sync::mpsc::UnboundedReceiver<()>| async move { 42 },
-        );
+        let task = spawn_async_task(|__mb: AsyncMailbox<()>| async move { 42 });
 
         let result = task.join().await;
         assert_eq!(result, 42);
@@ -172,9 +186,9 @@ mod tests {
             sum
         });
 
-        task.send(100).await;
-        task.send(200).await;
-        task.send(300).await;
+        task.send(100).await.unwrap();
+        task.send(200).await.unwrap();
+        task.send(300).await.unwrap();
 
         let result = task.join().await;
         assert_eq!(result, 600);
@@ -191,9 +205,9 @@ mod tests {
             total
         });
 
-        task.send(10).await;
-        task.send(20).await;
-        task.send(30).await;
+        task.send(10).await.unwrap();
+        task.send(20).await.unwrap();
+        task.send(30).await.unwrap();
 
         let result = task.join().await;
         assert_eq!(result, 60);
@@ -218,12 +232,12 @@ mod tests {
             total
         });
 
-        task1.send(10).await;
-        task2.send(10).await;
-        task1.send(20).await;
-        task2.send(20).await;
-        task1.send(30).await;
-        task2.send(30).await;
+        task1.send(10).await.unwrap();
+        task2.send(10).await.unwrap();
+        task1.send(20).await.unwrap();
+        task2.send(20).await.unwrap();
+        task1.send(30).await.unwrap();
+        task2.send(30).await.unwrap();
 
         let result1 = task1.join().await;
         let result2 = task2.join().await;
