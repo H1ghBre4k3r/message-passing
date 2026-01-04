@@ -19,7 +19,7 @@ async fn main() {
 
     let next_task: AsyncTask<(), u32> = async_proc! {
         for i in 0..10 {
-            task.send(i).await;
+            task.send(i).await.unwrap();
             let current_counter = receiver.recv().await.unwrap();
             println!("current counter: {current_counter}");
         }

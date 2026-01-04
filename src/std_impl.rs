@@ -1,13 +1,29 @@
 use std::{
-    sync::mpsc::{Receiver, Sender, channel},
+    sync::mpsc::{Receiver, RecvError, RecvTimeoutError, SendError, Sender, channel},
     thread::JoinHandle,
+    time::Duration,
 };
 
-#[derive(Clone)]
-struct Mailbox<T>(Sender<T>);
+pub struct Mailbox<T> {
+    receiver: Receiver<T>,
+}
+
+impl<T> Mailbox<T> {
+    pub fn new(receiver: Receiver<T>) -> Self {
+        Mailbox { receiver }
+    }
+
+    pub fn recv(&self) -> Result<T, RecvError> {
+        self.receiver.recv()
+    }
+
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<T, RecvTimeoutError> {
+        self.receiver.recv_timeout(timeout)
+    }
+}
 
 pub struct Task<M, R> {
-    mailbox: Mailbox<M>,
+    sender: Sender<M>,
     handle: JoinHandle<R>,
 }
 
@@ -15,22 +31,22 @@ impl<T, R> Task<T, R>
 where
     T: Clone,
 {
-    pub fn send(&self, payload: T) {
-        self.mailbox.0.send(payload).unwrap()
+    pub fn send(&self, payload: T) -> Result<(), SendError<T>> {
+        self.sender.send(payload)
     }
 
-    pub fn join(self) -> R {
-        self.handle.join().unwrap()
+    pub fn join(self) -> std::thread::Result<R> {
+        self.handle.join()
     }
 }
 
 #[macro_export]
 macro_rules! proc {
     ($($content:tt)*) => {
-        notizia::spawn_task(move |_receiver| {
+        notizia::spawn_task(move |__mb| {
             #[allow(unused_macros)]
             macro_rules! recv {
-                () => { _receiver.recv().unwrap() }
+                () => { __mb.recv().unwrap() }
             }
             $($content)*
         })
@@ -41,16 +57,13 @@ pub fn spawn_task<M, R, Func>(func: Func) -> Task<M, R>
 where
     M: Send + 'static,
     R: Send + 'static,
-    Func: FnOnce(Receiver<M>) -> R + Send + 'static,
+    Func: FnOnce(Mailbox<M>) -> R + Send + 'static,
 {
     let (sender, receiver) = channel::<M>();
-    let mb = Mailbox(sender);
-    let handle = std::thread::spawn(move || func(receiver));
+    let mailbox = Mailbox::new(receiver);
+    let handle = std::thread::spawn(move || func(mailbox));
 
-    Task {
-        mailbox: mb,
-        handle,
-    }
+    Task { sender, handle }
 }
 
 #[cfg(test)]
@@ -59,19 +72,19 @@ mod tests {
 
     #[test]
     fn test_basic_task_communication() {
-        let task = spawn_task(|receiver| {
+        let task = spawn_task(|mailbox| {
             let mut total = 0;
             for _ in 0..3 {
-                total += receiver.recv().unwrap();
+                total += mailbox.recv().unwrap();
             }
             total
         });
 
-        task.send(10);
-        task.send(20);
-        task.send(30);
+        task.send(10).unwrap();
+        task.send(20).unwrap();
+        task.send(30).unwrap();
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 60);
     }
 
@@ -86,10 +99,10 @@ mod tests {
         });
 
         for i in 1..=5 {
-            task.send(i);
+            task.send(i).unwrap();
         }
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 15);
     }
 
@@ -103,11 +116,11 @@ mod tests {
             sum
         });
 
-        task.send(5);
-        task.send(10);
-        task.send(15);
+        task.send(5).unwrap();
+        task.send(10).unwrap();
+        task.send(15).unwrap();
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 30);
     }
 
@@ -122,11 +135,11 @@ mod tests {
             count
         });
 
-        task.send("hello".to_string());
-        task.send("world".to_string());
-        task.send("test".to_string());
+        task.send("hello".to_string()).unwrap();
+        task.send("world".to_string()).unwrap();
+        task.send("test".to_string()).unwrap();
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 3);
     }
 
@@ -142,10 +155,10 @@ mod tests {
         });
 
         for i in 1..=5 {
-            task.send(i);
+            task.send(i).unwrap();
         }
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, vec![1, 2, 3, 4, 5]);
     }
 
@@ -153,7 +166,7 @@ mod tests {
     fn test_empty_task() {
         let task = spawn_task::<(), u32, _>(|_receiver| 42);
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 42);
     }
 
@@ -168,11 +181,11 @@ mod tests {
             sum
         });
 
-        task.send(100);
-        task.send(200);
-        task.send(300);
+        task.send(100).unwrap();
+        task.send(200).unwrap();
+        task.send(300).unwrap();
 
-        let result = task.join();
+        let result = task.join().unwrap();
         assert_eq!(result, 600);
     }
 }

@@ -19,14 +19,14 @@ fn main() {
 
     let next_task: Task<(), u32> = proc! {
         for i in 0..10 {
-            task.send(i);
+            task.send(i).unwrap();
             let current_counter = receiver.recv().unwrap();
             println!("current counter: {current_counter}");
         }
 
-        task.join()
+        task.join().expect("Task should be able to join")
     };
 
-    let result = next_task.join();
+    let result = next_task.join().expect("Task should be able to join");
     println!("OH YES! {result}")
 }
