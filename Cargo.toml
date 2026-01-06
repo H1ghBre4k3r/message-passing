@@ -21,4 +21,4 @@ name = "async"
 required-features = ["tokio"]
 
 [dependencies]
-tokio = { version = "1.48.0", features = ["full"], optional = true }
+tokio = { version = "1.49.0", features = ["full"], optional = true }
