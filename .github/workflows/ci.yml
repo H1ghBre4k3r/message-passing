@@ -57,7 +57,7 @@ jobs:
         run: cargo build --workspace --verbose --release
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: build-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.profile }}
           path: target/${{ matrix.profile }}
@@ -228,7 +228,7 @@ jobs:
         run: cargo llvm-cov --workspace --html
 
       - name: Upload HTML coverage report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: target/llvm-cov/html/
