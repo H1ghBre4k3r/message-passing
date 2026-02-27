@@ -113,7 +113,7 @@ jobs:
             ${{ runner.os }}-${{ matrix.toolchain }}-${{ matrix.profile }}-
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: build-${{ matrix.os }}-${{ matrix.toolchain }}-${{ matrix.profile }}
           path: target/${{ matrix.profile }}
